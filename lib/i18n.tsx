@@ -19,6 +19,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.stats": "消息统计",
     "nav.config": "配置",
     "nav.skills": "技能管理",
+    "nav.alerts": "告警中心",
 
     // common
     "common.loading": "加载中...",
@@ -185,6 +186,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.stats": "Statistics",
     "nav.config": "Config",
     "nav.skills": "Skills",
+    "nav.alerts": "Alerts",
 
     // common
     "common.loading": "Loading...",

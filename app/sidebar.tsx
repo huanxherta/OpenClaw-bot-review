@@ -25,6 +25,7 @@ const NAV_ITEMS = [
     group: "nav.config",
     items: [
       { href: "/skills", icon: "🧩", labelKey: "nav.skills" },
+      { href: "/alerts", icon: "🔔", labelKey: "nav.alerts" },
     ],
   },
 ];
