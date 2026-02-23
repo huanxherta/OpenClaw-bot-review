@@ -250,19 +250,47 @@ async function checkModelAlerts(config: AlertConfig) {
   const rule = config.rules.find(r => r.id === "model_unavailable");
   if (!rule?.enabled) return results;
 
-  // 模拟：随机测试一个模型（实际应该调用 test-model API）
-  const testModel = "minimax/MiniMax-M2.5";
-  const isAvailable = Math.random() > 0.3; // 70% 概率可用
+  // 读取配置中的所有模型
+  const openclawConfig = getOpenclawConfig();
+  const providers = openclawConfig.models?.providers || {};
 
-  if (!isAvailable) {
-    results.push(`🚨 模型 ${testModel} 不可用！`);
-    // 检查是否需要发送（频率控制）
-    const lastAlert = config.lastAlerts?.[rule.id] || 0;
-    const now = Date.now();
-    if (now - lastAlert > 60000) { // 1分钟内不重复告警
-      await sendAlert(config.receiveAgent, `模型 ${testModel} 不可用，请检查配置`);
-      config.lastAlerts = config.lastAlerts || {};
-      config.lastAlerts[rule.id] = now;
+  // 测试每个模型
+  const allModels: Array<{provider: string, id: string}> = [];
+  for (const [providerId, provider] of Object.entries(providers)) {
+    const p = provider as any;
+    if (p.models && Array.isArray(p.models)) {
+      for (const model of p.models) {
+        allModels.push({provider: providerId, id: model.id});
+      }
+    }
+  }
+
+  // 测试所有模型
+  for (const {provider, id} of allModels) {
+    try {
+      const testStart = Date.now();
+      const testResp = await fetch("http://localhost:3000/api/test-model", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({provider, modelId: id}),
+        signal: AbortSignal.timeout(10000),
+      });
+      
+      const testResult = await testResp.json();
+      
+      if (!testResult.ok) {
+        results.push(`🚨 模型 ${provider}/${id} 不可用！`);
+        
+        const lastAlert = config.lastAlerts?.[`${rule.id}_${provider}_${id}`] || 0;
+        const now = Date.now();
+        if (now - lastAlert > 60000) {
+          await sendAlert(config.receiveAgent, `模型 ${provider}/${id} 不可用，请检查配置`);
+          config.lastAlerts = config.lastAlerts || {};
+          config.lastAlerts[`${rule.id}_${provider}_${id}`] = now;
+        }
+      }
+    } catch (err: any) {
+      results.push(`🚨 测试模型 ${provider}/${id} 时出错：${err.message}`);
     }
   }
 
