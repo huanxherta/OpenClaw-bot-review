@@ -112,34 +112,43 @@ function getFeishuDmUser(agentId: string): string | null {
   }
 }
 
-// 通过飞书 API 发送告警消息 (使用 main app 发送)
+// 通过飞书 API 发送告警消息
 async function sendAlertViaFeishu(agentId: string, message: string) {
+  console.log(`[ALERT] sendAlertViaFeishu called with agentId: ${agentId}, message: ${message}`);
+  
   const openclawConfig = getOpenclawConfig();
   const feishuConfig = openclawConfig.channels?.feishu || {};
   const feishuAccounts = feishuConfig.accounts || {};
+  const bindings = openclawConfig.bindings || [];
   
-  // 使用 main app 发送告警（因为用户的 open_id 是 main app 的）
-  const mainAccount = feishuAccounts["main"];
-  if (!mainAccount?.appId || !mainAccount?.appSecret) {
-    console.log(`[ALERT] No main Feishu account found`);
-    return { sent: false, error: "No main app" };
+  console.log(`[ALERT] Feishu accounts found:`, Object.keys(feishuAccounts));
+  
+  // 获取 agent 对应的飞书账号配置
+  const accountInfo = getFeishuAccountForAgent(agentId, feishuConfig, bindings);
+  if (!accountInfo) {
+    console.log(`[ALERT] No Feishu account found for agent ${agentId}`);
+    return { sent: false, error: `No account for agent ${agentId}` };
   }
+  
+  console.log(`[ALERT] Using account: ${accountInfo.accountId}, appId: ${accountInfo.appId}`);
   
   // 从 receiveAgent 的 session 中获取用户的 open_id
   const testUserId = getFeishuDmUser(agentId);
+  console.log(`[ALERT] Feishu DM user found: ${testUserId}`);
   if (!testUserId) {
     console.log(`[ALERT] No Feishu DM user found for agent ${agentId}`);
     return { sent: false, error: "No DM user" };
   }
   
   const baseUrl = (feishuConfig.domain === "lark") ? "https://open.larksuite.com" : "https://open.feishu.cn";
+  console.log(`[ALERT] Using baseUrl: ${baseUrl}`);
   
   try {
     // 获取 tenant_access_token
     const tokenResp = await fetch(`${baseUrl}/open-apis/auth/v3/tenant_access_token/internal`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ app_id: mainAccount.appId, app_secret: mainAccount.appSecret }),
+      body: JSON.stringify({ app_id: accountInfo.appId, app_secret: accountInfo.appSecret }),
       signal: AbortSignal.timeout(10000),
     });
     
@@ -200,9 +209,11 @@ async function sendAlertViaFeishu(agentId: string, message: string) {
       console.log(`[ALERT] Sent to ${agentId}: ${message}`);
       return { sent: true, message };
     } else {
+      console.log(`[ALERT] Send failed (user_id):`, msgData);
       return { sent: false, error: msgData.msg };
     }
   } catch (err: any) {
+    console.log(`[ALERT] Error sending message:`, err);
     return { sent: false, error: err.message };
   }
 }
