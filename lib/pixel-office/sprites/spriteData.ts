@@ -270,6 +270,34 @@ export const PC_BACK_SPRITE: SpriteData = (() => {
   ]
 })()
 
+/** Sony mirrorless camera: 16x16 — top-down view */
+export const CAMERA_SPRITE: SpriteData = (() => {
+  const B = '#222222' // body
+  const G = '#333333' // grip
+  const L = '#444466' // lens ring
+  const R = '#5566AA' // lens glass
+  const S = '#888888' // silver accent
+  const D = '#1A1A1A' // dark
+  return [
+    [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    [_, _, _, _, _, B, B, B, B, B, B, B, _, _, _, _],
+    [_, _, _, G, G, B, S, S, S, S, S, B, B, _, _, _],
+    [_, _, _, G, G, B, B, B, B, B, B, B, B, _, _, _],
+    [_, _, _, G, G, B, B, L, L, L, B, B, B, _, _, _],
+    [_, _, _, G, G, B, L, R, R, R, L, B, B, _, _, _],
+    [_, _, _, G, G, B, L, R, R, R, L, B, B, _, _, _],
+    [_, _, _, G, G, B, L, R, R, R, L, B, B, _, _, _],
+    [_, _, _, G, G, B, B, L, L, L, B, B, B, _, _, _],
+    [_, _, _, G, G, B, B, B, B, B, B, B, B, _, _, _],
+    [_, _, _, D, D, B, B, B, B, B, B, B, D, _, _, _],
+    [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+  ]
+})()
+
 /** Desk lamp: 16x16 — top-down lamp with light cone */
 export const LAMP_SPRITE: SpriteData = (() => {
   const Y = '#FFDD55'

@@ -71,6 +71,8 @@ export interface FurnitureInstance {
   y: number
   /** Y value used for depth sorting (typically bottom edge) */
   zY: number
+  /** Optional emoji to render instead of sprite */
+  emoji?: string
 }
 
 export interface ToolActivity {
@@ -89,6 +91,7 @@ export const FurnitureType = {
   CHAIR: 'chair',
   PC: 'pc',
   PC_BACK: 'pc_back',
+  CAMERA: 'camera',
   LAMP: 'lamp',
   // Tileset — Desks
   TABLE_WOOD_SM_VERTICAL: 'ts_table_wood_sm_vertical',
@@ -133,6 +136,7 @@ export interface FurnitureCatalogEntry {
   category?: string
   orientation?: string
   canPlaceOnSurfaces?: boolean
+  emoji?: string
   backgroundTiles?: number
   canPlaceOnWalls?: boolean
 }

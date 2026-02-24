@@ -59,7 +59,8 @@ export function layoutToFurnitureInstances(furniture: PlacedFurniture[]): Furnit
     if (entry.canPlaceOnSurfaces) {
       for (let dr = 0; dr < entry.footprintH; dr++) {
         for (let dc = 0; dc < entry.footprintW; dc++) {
-          const deskZ = deskZByTile.get(`${item.col + dc},${item.row + dr}`)
+          const key = `${Math.round(item.col + dc)},${Math.round(item.row + dr)}`
+          const deskZ = deskZByTile.get(key)
           if (deskZ !== undefined && deskZ + 0.5 > zY) zY = deskZ + 0.5
         }
       }
@@ -72,7 +73,7 @@ export function layoutToFurnitureInstances(furniture: PlacedFurniture[]): Furnit
       sprite = getColorizedSprite(`furn-${item.type}-${h}-${s}-${bv}-${cv}-${item.color.colorize ? 1 : 0}`, entry.sprite, item.color)
     }
 
-    instances.push({ sprite, x, y, zY })
+    instances.push({ sprite, x, y, zY, ...(entry.emoji ? { emoji: entry.emoji } : {}) })
   }
   return instances
 }
@@ -302,6 +303,7 @@ export function createDefaultLayout(): OfficeLayout {
     { uid: 'chair-r1-left', type: FurnitureType.CHAIR, col: 12, row: 4 },
     { uid: 'chair-r1-right', type: FurnitureType.CHAIR, col: 15, row: 3 },
     { uid: 'pc-r', type: FurnitureType.PC, col: 14, row: 3 },
+    { uid: 'camera-r', type: FurnitureType.CAMERA, col: 13.5, row: 3.5 },
     { uid: 'plant-r1', type: FurnitureType.PLANT, col: 19, row: 1 },
     { uid: 'whiteboard-r', type: FurnitureType.WHITEBOARD, col: 15, row: 0 },
     { uid: 'library-r', type: FurnitureType.LIBRARY_GRAY_FULL, col: 18, row: 3 },

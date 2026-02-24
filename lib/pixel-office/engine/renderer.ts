@@ -140,15 +140,43 @@ export function renderScene(
 
   // Furniture
   for (const f of furniture) {
-    const cached = getCachedSprite(f.sprite, zoom)
     const fx = offsetX + f.x * zoom
     const fy = offsetY + f.y * zoom
-    drawables.push({
-      zY: f.zY,
-      draw: (c) => {
-        c.drawImage(cached, fx, fy)
-      },
-    })
+    if (f.emoji) {
+      const emojiSize = TILE_SIZE * zoom
+      const emojiX = fx + emojiSize / 2
+      const emojiY = fy + emojiSize * 0.8
+      drawables.push({
+        zY: f.zY,
+        draw: (c) => {
+          c.font = `${emojiSize * 0.7}px serif`
+          c.textAlign = 'center'
+          c.textBaseline = 'middle'
+          c.fillText(f.emoji!, emojiX, emojiY)
+
+          // Camera flash effect: brief white burst every 10 seconds
+          const flashCycle = (Date.now() % 10000) / 10000
+          if (flashCycle < 0.03) {
+            const flashAlpha = 1 - flashCycle / 0.03
+            const flashR = emojiSize * 1.5
+            const grad = c.createRadialGradient(emojiX, emojiY, 0, emojiX, emojiY, flashR)
+            grad.addColorStop(0, `rgba(255,255,255,${flashAlpha * 0.9})`)
+            grad.addColorStop(0.3, `rgba(255,255,200,${flashAlpha * 0.5})`)
+            grad.addColorStop(1, `rgba(255,255,200,0)`)
+            c.fillStyle = grad
+            c.fillRect(emojiX - flashR, emojiY - flashR, flashR * 2, flashR * 2)
+          }
+        },
+      })
+    } else {
+      const cached = getCachedSprite(f.sprite, zoom)
+      drawables.push({
+        zY: f.zY,
+        draw: (c) => {
+          c.drawImage(cached, fx, fy)
+        },
+      })
+    }
   }
 
   // Characters
