@@ -322,6 +322,12 @@ async function checkBotResponseAlerts(config: AlertConfig) {
     );
   } catch { return results; }
 
+  // 如果配置了 targetAgents，只检测指定的机器人
+  const targetAgents = rule.targetAgents;
+  if (targetAgents && targetAgents.length > 0) {
+    agentIds = agentIds.filter(id => targetAgents.includes(id));
+  }
+
   for (const agentId of agentIds) {
     const sessionsDir = path.join(agentsDir, agentId, "sessions");
     let files: string[] = [];

@@ -10,6 +10,7 @@ interface AlertRule {
   name: string;
   enabled: boolean;
   threshold?: number; // 阈值配置
+  targetAgents?: string[]; // 指定要检测的机器人列表
 }
 
 interface AlertConfig {
@@ -83,6 +84,9 @@ export async function PUT(request: Request) {
           existingRule.enabled = newRule.enabled;
           if (newRule.threshold !== undefined) {
             existingRule.threshold = newRule.threshold;
+          }
+          if (newRule.targetAgents !== undefined) {
+            existingRule.targetAgents = newRule.targetAgents;
           }
         }
       }

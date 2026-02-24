@@ -9,6 +9,7 @@ interface AlertRule {
   name: string;
   enabled: boolean;
   threshold?: number;
+  targetAgents?: string[];
 }
 
 interface AlertConfig {
@@ -358,6 +359,60 @@ export default function AlertsPage() {
                       disabled={!config.enabled || !rule.enabled || saving}
                       className="w-20 px-2 py-1 text-sm rounded border border-[var(--border)] bg-[var(--card)] text-[var(--text)] disabled:opacity-50"
                     />
+                  </div>
+                )}
+                {/* bot_no_response 规则：选择要检测的机器人 */}
+                {rule.id === "bot_no_response" && rule.enabled && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="text-xs text-[var(--text-muted)]">
+                      {locale === "zh" ? "检测机器人:" : "Monitor:"}
+                    </span>
+                    {agents.map((agent) => {
+                      const selected = rule.targetAgents?.includes(agent.id) ?? true;
+                      return (
+                        <button
+                          key={agent.id}
+                          onClick={() => {
+                            const currentAgents = rule.targetAgents || [];
+                            const newAgents = selected
+                              ? currentAgents.filter((id) => id !== agent.id)
+                              : [...currentAgents, agent.id];
+                            // 如果原来是空的或undefined，默认全选
+                            const finalAgents = newAgents.length === 0 && !rule.targetAgents 
+                              ? agents.map(a => a.id)
+                              : newAgents;
+                            
+                            const rules = config.rules.map((r) =>
+                              r.id === rule.id ? { ...r, targetAgents: finalAgents } : r
+                            );
+                            setSaving(true);
+                            fetch("/api/alerts", {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ rules }),
+                            })
+                              .then((r) => r.json())
+                              .then((newConfig) => {
+                                setConfig(newConfig);
+                                setSaved(true);
+                                setTimeout(() => setSaved(false), 2000);
+                              })
+                              .finally(() => setSaving(false));
+                          }}
+                          disabled={!config.enabled || saving}
+                          className={`px-2 py-1 text-xs rounded border transition ${
+                            selected
+                              ? "bg-[var(--accent)] text-[var(--bg)] border-[var(--accent)]"
+                              : "bg-[var(--bg)] border-[var(--border)] hover:border-[var(--accent)]"
+                          } disabled:opacity-50`}
+                        >
+                          {agent.emoji} {agent.name}
+                        </button>
+                      );
+                    })}
+                    <span className="text-xs text-[var(--text-muted)] ml-2">
+                      {locale === "zh" ? "(不选则检测所有)" : "(empty = all)"}
+                    </span>
                   </div>
                 )}
               </div>
