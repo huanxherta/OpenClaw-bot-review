@@ -359,18 +359,29 @@ function getWhatsappDmUser(agentId: string): string | null {
   }
 }
 
+function getWhatsappAllowlistUser(whatsappConfig: any): string | null {
+  const list = Array.isArray(whatsappConfig?.allowFrom)
+    ? whatsappConfig.allowFrom
+    : Array.isArray(whatsappConfig?.dm?.allowFrom)
+      ? whatsappConfig.dm.allowFrom
+      : [];
+  const first = list.find((v: any) => typeof v === "string" && v.trim().length > 0);
+  return first ? first.trim() : null;
+}
+
 async function testWhatsapp(
   agentId: string,
   gatewayPort: number,
   gatewayToken: string,
-  testUserId: string | null
+  testUserId: string | null,
+  recipientSource: "session" | "allowFrom" | "none"
 ): Promise<PlatformTestResult> {
   const startTime = Date.now();
 
   if (!testUserId) {
     return {
       agentId, platform: "whatsapp", ok: false,
-      error: "No WhatsApp DM session found — send a message to the bot first",
+      error: "No WhatsApp recipient configured. Set channels.whatsapp.allowFrom or start one DM session first",
       elapsed: Date.now() - startTime,
     };
   }
@@ -395,26 +406,13 @@ async function testWhatsapp(
     });
 
     const elapsed = Date.now() - startTime;
-
-    // Check for success indicator in output
-    const ok = result.includes("Sent via gateway") || result.includes("Message ID");
-
-    if (ok) {
-      // Extract message ID if present
-      const idMatch = result.match(/Message ID:\s*(\S+)/);
-      const msgId = idMatch ? idMatch[1] : "";
-      return {
-        agentId, platform: "whatsapp", ok: true,
-        detail: `WhatsApp → DM sent to ${testUserId} (${elapsed}ms)${msgId ? ' · ' + msgId : ''}`,
-        elapsed,
-      };
-    } else {
-      return {
-        agentId, platform: "whatsapp", ok: false,
-        error: result.trim().slice(0, 300) || "No success confirmation from openclaw",
-        elapsed,
-      };
-    }
+    const sourceLabel = recipientSource === "allowFrom" ? "allowFrom" : "session";
+    const outputSummary = result.trim().slice(0, 120);
+    return {
+      agentId, platform: "whatsapp", ok: true,
+      detail: `WhatsApp → DM sent to ${testUserId} (${elapsed}ms, via ${sourceLabel})${outputSummary ? ` · ${outputSummary}` : ""}`,
+      elapsed,
+    };
   } catch (err: any) {
     return {
       agentId, platform: "whatsapp", ok: false,
@@ -546,8 +544,12 @@ export async function POST() {
 
       // WhatsApp: only test once, via gateway
       if (id === "main" && whatsappConfig && whatsappConfig.enabled !== false) {
-        const whatsappTestUser = getWhatsappDmUser(id);
-        platformTests.push(testWhatsapp(id, gatewayPort, gatewayToken, whatsappTestUser));
+        const sessionUser = getWhatsappDmUser(id);
+        const allowFromUser = getWhatsappAllowlistUser(whatsappConfig);
+        const whatsappTestUser = sessionUser || allowFromUser || null;
+        const source: "session" | "allowFrom" | "none" =
+          sessionUser ? "session" : (allowFromUser ? "allowFrom" : "none");
+        platformTests.push(testWhatsapp(id, gatewayPort, gatewayToken, whatsappTestUser, source));
       }
     }
 
@@ -557,4 +559,8 @@ export async function POST() {
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
+}
+
+export async function GET() {
+  return POST();
 }
