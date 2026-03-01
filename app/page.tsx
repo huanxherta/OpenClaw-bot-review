@@ -186,6 +186,20 @@ interface PlatformTestResult {
 function PlatformBadge({ platform, agentId, gatewayPort, gatewayToken, gatewayHost, t, testResult }: { platform: Platform; agentId: string; gatewayPort: number; gatewayToken?: string; gatewayHost?: string; t: TFunc; testResult?: PlatformTestResult | null }) {
   const pName = platform.name;
   const badgeWidthClass = "w-[8.25rem]";
+  const remoteLogoSrc = pName === "feishu"
+    ? "https://cdn.simpleicons.org/lark/2E5BFF"
+    : pName === "telegram"
+    ? "https://cdn.simpleicons.org/telegram/26A5E4"
+    : pName === "whatsapp"
+    ? "https://cdn.simpleicons.org/whatsapp/25D366"
+    : "https://cdn.simpleicons.org/discord/5865F2";
+  const logoFallbackSrc = pName === "feishu"
+    ? "/assets/platform-logos/feishu.svg"
+    : pName === "telegram"
+    ? "/assets/platform-logos/telegram.svg"
+    : pName === "whatsapp"
+    ? "/assets/platform-logos/whatsapp.svg"
+    : "/assets/platform-logos/discord.svg";
 
   let sessionKey: string;
   if (pName === "feishu" && platform.botOpenId) {
@@ -210,10 +224,11 @@ function PlatformBadge({ platform, agentId, gatewayPort, gatewayToken, gatewayHo
     ? "bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/40 hover:border-green-400"
     : "bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/40 hover:border-purple-400";
 
-  const label = pName === "feishu" ? t("platform.feishu")
+  const labelRaw = pName === "feishu" ? t("platform.feishu")
     : pName === "telegram" ? t("platform.telegram")
     : pName === "whatsapp" ? t("platform.whatsapp")
     : t("platform.discord");
+  const label = labelRaw.replace(/^[^\p{L}\p{N}]+/u, "").trim();
 
   return (
     <div className="inline-flex items-center gap-1.5 max-w-full">
@@ -225,6 +240,16 @@ function PlatformBadge({ platform, agentId, gatewayPort, gatewayToken, gatewayHo
         title={t("agent.openChat")}
         className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all hover:scale-105 hover:shadow-md min-w-0 ${badgeWidthClass} ${badgeStyle}`}
       >
+        <img
+          src={remoteLogoSrc}
+          alt={`${label} logo`}
+          className="w-3.5 h-3.5 shrink-0"
+          onError={(e) => {
+            if (e.currentTarget.dataset.fallbackApplied === "1") return;
+            e.currentTarget.dataset.fallbackApplied = "1";
+            e.currentTarget.src = logoFallbackSrc;
+          }}
+        />
         <span className="shrink-0">{label}</span>
         {pName === "feishu" && platform.accountId && (
           <span className="opacity-60 truncate max-w-[4.5rem]">({platform.accountId})</span>
