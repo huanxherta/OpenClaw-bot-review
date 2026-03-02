@@ -158,6 +158,7 @@ const MOBILE_MIN_ZOOM = 0.55
 const MOBILE_MAX_ZOOM = 6
 const MOBILE_FIT_PADDING_PX = 2
 const MOBILE_TOP_EXTRA_TILES = 0.5
+const MOBILE_VIEW_NUDGE_Y_PX = -10
 const CODE_SNIPPET_LIFETIME_SEC = 5.5
 const FLOATING_TICK_INTERVAL_DESKTOP_MS = 48
 const FLOATING_TICK_INTERVAL_MOBILE_MS = 32
@@ -356,7 +357,8 @@ export default function PixelOfficePage() {
         const topExtraPx = topExtraTiles * TILE_SIZE * nextZoom
         const minPanY = MOBILE_FIT_PADDING_PX + topExtraPx - centerOffsetY
         const maxPanY = height - MOBILE_FIT_PADDING_PX - (centerOffsetY + mapH)
-        const targetPanY = minPanY > maxPanY ? minPanY : Math.min(maxPanY, Math.max(minPanY, 0))
+        const basePanY = minPanY > maxPanY ? minPanY : Math.min(maxPanY, Math.max(minPanY, 0))
+        const targetPanY = Math.min(maxPanY, Math.max(minPanY - 16, basePanY + MOBILE_VIEW_NUDGE_Y_PX))
         panRef.current = { x: 0, y: Math.round(targetPanY) }
       } else {
         zoomRef.current = DESKTOP_CANVAS_ZOOM
@@ -1246,6 +1248,28 @@ export default function PixelOfficePage() {
     isMobileViewport
       ? `w-full ${maxHeight} overflow-y-auto rounded-t-2xl border-x border-t border-[var(--border)] bg-[var(--card)] shadow-2xl p-4 pb-6`
       : `${desktopWidth} ${maxHeight} overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-2xl p-4`
+  const mobileAgentPages: AgentActivity[][] = []
+  for (let i = 0; i < agents.length; i += 9) {
+    mobileAgentPages.push(agents.slice(i, i + 9))
+  }
+  const renderAgentChip = (agent: AgentActivity, mobileGrid = false) => (
+    <div key={agent.agentId} className={`pixel-agent-chip inline-flex items-center rounded-lg border transition-colors ${
+      mobileGrid ? 'w-full min-w-0 gap-1.5 px-2 py-1.5' : 'shrink-0 gap-2 px-3 py-1.5'
+    } ${
+      agent.state === 'working' ? `pixel-agent-chip-working${isMobileViewport ? '' : ' animate-pulse'}` :
+      agent.state === 'idle' ? `pixel-agent-chip-idle${isMobileViewport ? '' : ' animate-pulse'}` :
+      'pixel-agent-chip-neutral'
+    }`}
+      {...(agent.state === 'working' && !isMobileViewport ? { style: { animationDuration: '1.3s' } } : {})}
+    >
+      <span className={mobileGrid ? 'shrink-0 text-sm' : ''}>{agent.emoji}</span>
+      <span className={mobileGrid ? 'min-w-0 text-xs truncate' : 'text-sm'}>{agent.name}</span>
+      {agent.state === 'working' && <span className={`pixel-agent-chip-state uppercase tracking-wider ${mobileGrid ? 'text-[9px] truncate' : 'text-[10px]'}`}>{t('pixelOffice.state.working')}</span>}
+      {agent.state === 'idle' && <span className={`pixel-agent-chip-state uppercase tracking-wider ${mobileGrid ? 'text-[9px] truncate' : 'text-[10px]'}`}>{t('pixelOffice.state.idle')}</span>}
+      {agent.state === 'offline' && <span className={`pixel-agent-chip-state uppercase tracking-wider ${mobileGrid ? 'text-[9px] truncate' : 'text-[10px]'}`}>{t('pixelOffice.state.offline')}</span>}
+      {agent.state === 'waiting' && <span className={`pixel-agent-chip-state uppercase tracking-wider ${mobileGrid ? 'text-[9px] truncate' : 'text-[10px]'}`}>{t('pixelOffice.state.waiting')}</span>}
+    </div>
+  )
 
   return (
     <div className="relative flex flex-col overflow-hidden h-[calc(100dvh-3.5rem)] md:h-full">
@@ -1304,23 +1328,24 @@ export default function PixelOfficePage() {
             </button>
           </div>
         </div>
-        <div className="flex gap-2 flex-1 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible">
-          {agents.map(agent => (
-            <div key={agent.agentId} className={`shrink-0 pixel-agent-chip inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
-              agent.state === 'working' ? `pixel-agent-chip-working${isMobileViewport ? '' : ' animate-pulse'}` :
-              agent.state === 'idle' ? `pixel-agent-chip-idle${isMobileViewport ? '' : ' animate-pulse'}` :
-              'pixel-agent-chip-neutral'
-            }`}
-              {...(agent.state === 'working' && !isMobileViewport ? { style: { animationDuration: '1.3s' } } : {})}
-            >
-              <span>{agent.emoji}</span>
-              <span className="text-sm">{agent.name}</span>
-              {agent.state === 'working' && <span className="pixel-agent-chip-state text-[10px] uppercase tracking-wider">{t('pixelOffice.state.working')}</span>}
-              {agent.state === 'idle' && <span className="pixel-agent-chip-state text-[10px] uppercase tracking-wider">{t('pixelOffice.state.idle')}</span>}
-              {agent.state === 'offline' && <span className="pixel-agent-chip-state text-[10px] uppercase tracking-wider">{t('pixelOffice.state.offline')}</span>}
-              {agent.state === 'waiting' && <span className="pixel-agent-chip-state text-[10px] uppercase tracking-wider">{t('pixelOffice.state.waiting')}</span>}
+        <div className="md:hidden overflow-x-auto pb-1">
+          {agents.length === 0 ? (
+            <div className="text-[var(--text-muted)] text-sm">{t('common.noData')}</div>
+          ) : (
+            <div className="flex gap-2 min-w-full snap-x snap-mandatory">
+              {mobileAgentPages.map((page, pageIndex) => (
+                <div key={`mobile-agent-page-${pageIndex}`} className="grid grid-cols-3 grid-rows-3 gap-2 min-w-full h-[8.4rem] shrink-0 snap-start">
+                  {page.map((agent) => renderAgentChip(agent, true))}
+                  {page.length < 9 && Array.from({ length: 9 - page.length }).map((_, i) => (
+                    <div key={`mobile-agent-page-${pageIndex}-placeholder-${i}`} className="rounded-lg border border-transparent" />
+                  ))}
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+        </div>
+        <div className="hidden md:flex gap-2 flex-1 flex-wrap">
+          {agents.map((agent) => renderAgentChip(agent))}
           {agents.length === 0 && (
             <div className="text-[var(--text-muted)] text-sm">{t('common.noData')}</div>
           )}
