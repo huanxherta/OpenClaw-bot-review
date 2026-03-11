@@ -76,8 +76,8 @@ function getAgentStateOpenClaw(agentId: string): AgentStatus {
 function getAgentStateNanobot(agentId: string): AgentStatus {
   const nanobotHome = path.join(os.homedir(), ".nanobot");
   const workspaceDir = path.join(nanobotHome, "workspace");
-  const agentDir = path.join(workspaceDir, agentId);
-  const sessionsDir = path.join(agentDir, "sessions");
+  // Nanobot 把所有会话存储在一个共享的 sessions 目录中，不分按代理
+  const sessionsDir = path.join(workspaceDir, "sessions");
   
   const now = Date.now();
   let lastActive: number | null = null;
@@ -89,7 +89,7 @@ function getAgentStateNanobot(agentId: string): AgentStatus {
       .filter(f => f.endsWith(".jsonl") && !f.includes(".deleted."))
       .map(f => ({ name: f, mtime: fs.statSync(path.join(sessionsDir, f)).mtimeMs }))
       .sort((a, b) => b.mtime - a.mtime)
-      .slice(0, 5); // 只看最近5个文件
+      .slice(0, 10); // 只看最近10个文件
 
     for (const file of files) {
       // 只看最近3分钟内修改过的文件
