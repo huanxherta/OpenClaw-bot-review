@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { NANOBOT_CONFIG_PATH, NANOBOT_HOME } from "@/lib/openclaw-paths";
+import { NANOBOT_CONFIG_PATH, NANOBOT_HOME, OPENCLAW_CONFIG_PATH, OPENCLAW_HOME } from "@/lib/openclaw-paths";
 
 // 30秒内存缓存
 let configCache: { data: any; ts: number } | null = null;
@@ -14,52 +14,88 @@ export async function GET() {
   }
 
   try {
+    // 优先尝试 Nanobot 配置
+    let configPath = NANOBOT_CONFIG_PATH;
+    let configHome = NANOBOT_HOME;
+    let framework = "nanobot";
+
     if (!fs.existsSync(NANOBOT_CONFIG_PATH)) {
-      return NextResponse.json({ error: "Nanobot config not found" }, { status: 404 });
+      // 如果 Nanobot 不存在，尝试 OpenClaw
+      if (fs.existsSync(OPENCLAW_CONFIG_PATH)) {
+        configPath = OPENCLAW_CONFIG_PATH;
+        configHome = OPENCLAW_HOME;
+        framework = "openclaw";
+      } else {
+        return NextResponse.json(
+          { error: "Neither Nanobot nor OpenClaw configuration found" },
+          { status: 404 }
+        );
+      }
     }
 
-    const raw = fs.readFileSync(NANOBOT_CONFIG_PATH, "utf-8");
+    const raw = fs.readFileSync(configPath, "utf-8");
     const config = JSON.parse(raw);
 
-    // 提取 agents 和 channels 信息
-    const channels = config.channels || {};
-    const providers = config.providers || {};
-    const defaultModel = config.agents?.defaults?.model || "unknown";
-    const workspace = config.agents?.defaults?.workspace || path.join(NANOBOT_HOME, "workspace");
+    if (framework === "openclaw") {
+      // 返回 OpenClaw 配置（兼容格式）
+      const defaults = config.agents?.defaults || {};
+      const defaultModel = typeof defaults.model === "string"
+        ? defaults.model
+        : defaults.model?.primary || "unknown";
 
-    // 统计启用的 channel
-    const enabledChannels = Object.entries(channels)
-      .filter(([_, cfg]: [string, any]) => cfg?.enabled)
-      .map(([name]) => name);
+      const result = {
+        framework: "openclaw",
+        version: config.version || "unknown",
+        defaultModel,
+        workspace: path.join(configHome, "workspace"),
+        agents: (config.agents?.list || []).length,
+        channels: {
+          enabled: Object.entries(config.channels || {})
+            .filter(([_, cfg]: [string, any]) => cfg?.enabled)
+            .map(([name]) => name),
+          config: config.channels || {},
+        },
+      };
 
-    // 统计启用的 provider
-    const enabledProviders = Object.entries(providers)
-      .filter(([_, cfg]: [string, any]) => cfg?.api_key)
-      .map(([name]) => name);
+      configCache = { data: result, ts: Date.now() };
+      return NextResponse.json(result);
+    } else {
+      // 返回 Nanobot 配置
+      const channels = config.channels || {};
+      const providers = config.providers || {};
+      const defaultModel = config.agents?.defaults?.model || "unknown";
+      const workspace = config.agents?.defaults?.workspace || path.join(configHome, "workspace");
 
-    // Nanobot 返回的是统一配置，而不是单个 agents
-    // 返回一个简化的结构，表示 nanobot 本身作为一个"agent"
-    const result = {
-      framework: "nanobot",
-      version: config.version || "unknown",
-      defaultModel,
-      workspace,
-      channels: {
-        enabled: enabledChannels,
-        config: channels,
-      },
-      providers: {
-        enabled: enabledProviders,
-        config: providers,
-      },
-    };
+      // 统计启用的 channel
+      const enabledChannels = Object.entries(channels)
+        .filter(([_, cfg]: [string, any]) => cfg?.enabled)
+        .map(([name]) => name);
 
-    // 更新缓存
-    configCache = { data: result, ts: Date.now() };
+      // 统计启用的 provider
+      const enabledProviders = Object.entries(providers)
+        .filter(([_, cfg]: [string, any]) => cfg?.api_key)
+        .map(([name]) => name);
 
-    return NextResponse.json(result);
+      const result = {
+        framework: "nanobot",
+        version: config.version || "unknown",
+        defaultModel,
+        workspace,
+        channels: {
+          enabled: enabledChannels,
+          config: channels,
+        },
+        providers: {
+          enabled: enabledProviders,
+          config: providers,
+        },
+      };
+
+      configCache = { data: result, ts: Date.now() };
+      return NextResponse.json(result);
+    }
   } catch (err) {
-    console.error("Failed to load nanobot config:", err);
+    console.error("Failed to load config:", err);
     return NextResponse.json(
       { error: (err as Error).message },
       { status: 500 }

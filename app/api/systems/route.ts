@@ -5,11 +5,32 @@ import { OPENCLAW_CONFIG_PATH, NANOBOT_CONFIG_PATH, getAvailableSystems } from "
 export async function GET() {
   try {
     const systems = getAvailableSystems();
+    
+    // 优先级：nanobot > openclaw
+    const primarySystem = systems.includes("nanobot") ? "nanobot" : systems.includes("openclaw") ? "openclaw" : null;
+    
     const result: any = {
       availableSystems: systems,
+      primarySystem,
       openclaw: null,
       nanobot: null,
     };
+
+    // Load Nanobot config if available
+    if (systems.includes("nanobot")) {
+      try {
+        const raw = fs.readFileSync(NANOBOT_CONFIG_PATH, "utf-8");
+        const config = JSON.parse(raw);
+        result.nanobot = {
+          found: true,
+          defaultModel: config.agents?.defaults?.model || "unknown",
+          hasProviders: !!(config.providers && Object.keys(config.providers).length > 0),
+          version: config.version || "unknown",
+        };
+      } catch (err) {
+        result.nanobot = { found: true, error: (err as Error).message };
+      }
+    }
 
     // Load OpenClaw config if available
     if (systems.includes("openclaw")) {
@@ -26,26 +47,12 @@ export async function GET() {
       }
     }
 
-    // Load Nanobot config if available
-    if (systems.includes("nanobot")) {
-      try {
-        const raw = fs.readFileSync(NANOBOT_CONFIG_PATH, "utf-8");
-        const config = JSON.parse(raw);
-        result.nanobot = {
-          found: true,
-          defaultModel: config.agents?.defaults?.model || "unknown",
-          hasProviders: !!(config.providers && Object.keys(config.providers).length > 0),
-        };
-      } catch (err) {
-        result.nanobot = { found: true, error: (err as Error).message };
-      }
-    }
-
     return NextResponse.json(result);
   } catch (err) {
     console.error("Failed to detect systems:", err);
     return NextResponse.json({
       availableSystems: [],
+      primarySystem: null,
       error: (err as Error).message,
     });
   }

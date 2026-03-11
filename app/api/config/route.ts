@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { OPENCLAW_CONFIG_PATH, OPENCLAW_HOME } from "@/lib/openclaw-paths";
+import { OPENCLAW_CONFIG_PATH, OPENCLAW_HOME, NANOBOT_CONFIG_PATH, NANOBOT_HOME } from "@/lib/openclaw-paths";
 
-// 配置文件路径：优先使用 OPENCLAW_HOME 环境变量，否则默认 ~/.openclaw
-const CONFIG_PATH = OPENCLAW_CONFIG_PATH;
-const OPENCLAW_DIR = OPENCLAW_HOME;
+// 配置文件路径：优先使用 NANOBOT 配置，其次 OPENCLAW
+let CONFIG_PATH = NANOBOT_CONFIG_PATH;
+let OPENCLAW_DIR = NANOBOT_HOME;
+let FRAMEWORK = "nanobot";
+
+// 如果 Nanobot 不存在，则使用 OpenClaw
+if (!fs.existsSync(NANOBOT_CONFIG_PATH) && fs.existsSync(OPENCLAW_CONFIG_PATH)) {
+  CONFIG_PATH = OPENCLAW_CONFIG_PATH;
+  OPENCLAW_DIR = OPENCLAW_HOME;
+  FRAMEWORK = "openclaw";
+}
 
 // 30秒内存缓存
 let configCache: { data: any; ts: number } | null = null;
