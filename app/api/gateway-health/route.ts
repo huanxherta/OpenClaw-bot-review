@@ -182,11 +182,22 @@ export async function GET() {
           const checkedAt = Date.now();
           const responseMs = checkedAt - startedAt;
           
+          // 提供更详细的错误信息
+          let errorMsg = "Gateway connection failed";
+          if (err?.name === "AbortError") {
+            errorMsg = `Gateway timeout (${responseMs}ms) - check if nanobot gateway is running on port ${port}`;
+          } else if (err?.cause?.code === "ECONNREFUSED") {
+            errorMsg = `Connection refused on port ${port} - nanobot gateway may not be running`;
+          } else if (err?.message) {
+            errorMsg = err.message;
+          }
+          
           return NextResponse.json({
             ok: false,
             framework: "nanobot",
-            error: err.message || "Gateway connection failed",
+            error: errorMsg,
             status: "down",
+            gateway_port: port,
             checkedAt,
             responseMs,
           });
