@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { DEFAULT_MODEL_PROBE_TIMEOUT_MS, probeModel } from "@/lib/model-probe";
+import { getAvailableSystems, NANOBOT_CONFIG_PATH } from "@/lib/openclaw-paths";
+import fs from "fs";
 
 const PROBE_TIMEOUT_MS = DEFAULT_MODEL_PROBE_TIMEOUT_MS;
 

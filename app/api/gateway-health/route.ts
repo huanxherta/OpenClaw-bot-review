@@ -3,7 +3,7 @@ import path from "path";
 import { exec, execFile } from "child_process";
 import { promisify } from "util";
 import { readJsonFileSync } from "@/lib/json";
-import { OPENCLAW_CONFIG_PATH } from "@/lib/openclaw-paths";
+import { OPENCLAW_CONFIG_PATH, NANOBOT_CONFIG_PATH, getAvailableSystems } from "@/lib/openclaw-paths";
 
 const CONFIG_PATH = OPENCLAW_CONFIG_PATH;
 const DEGRADED_LATENCY_MS = 1500;
@@ -124,8 +124,82 @@ async function getOpenclawVersion(): Promise<string | undefined> {
 export async function GET() {
   const startedAt = Date.now();
   try {
+    // 检测使用的框架
+    const systems = getAvailableSystems();
+    const useNanobot = systems.includes("nanobot");
+
+    if (useNanobot) {
+      // Nanobot gateway 检查
+      try {
+        const config = readJsonFileSync<any>(NANOBOT_CONFIG_PATH);
+        const port = config.gateway?.port || 18790;
+        const token = config.gateway?.token || "";
+        const webUrl = `http://localhost:${port}/chat${token ? '?token=' + encodeURIComponent(token) : ''}`;
+
+        const url = `http://localhost:${port}/api/health`;
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+
+        try {
+          const resp = await fetch(url, { headers, signal: controller.signal, cache: "no-store" });
+          clearTimeout(timeout);
+          
+          const checkedAt = Date.now();
+          const responseMs = checkedAt - startedAt;
+          
+          if (resp.ok) {
+            const data = await resp.json().catch(() => null);
+            return NextResponse.json({
+              ok: true,
+              data,
+              framework: "nanobot",
+              status: responseMs > DEGRADED_LATENCY_MS ? "degraded" : "healthy",
+              checkedAt,
+              responseMs,
+              webUrl,
+            });
+          } else {
+            return NextResponse.json({
+              ok: false,
+              framework: "nanobot",
+              error: `HTTP ${resp.status}`,
+              status: "down",
+              checkedAt,
+              responseMs,
+            });
+          }
+        } catch (err: any) {
+          clearTimeout(timeout);
+          const checkedAt = Date.now();
+          const responseMs = checkedAt - startedAt;
+          
+          return NextResponse.json({
+            ok: false,
+            framework: "nanobot",
+            error: err.message || "Gateway connection failed",
+            status: "down",
+            checkedAt,
+            responseMs,
+          });
+        }
+      } catch (err: any) {
+        return NextResponse.json({
+          ok: false,
+          framework: "nanobot",
+          error: `Failed to load nanobot config: ${err.message}`,
+          status: "down",
+          checkedAt: Date.now(),
+          responseMs: Date.now() - startedAt,
+        });
+      }
+    }
+
+    // OpenClaw gateway 检查（原有逻辑）
     const openclawVersion = await getOpenclawVersion();
-    const config = readJsonFileSync<any>(CONFIG_PATH);
+    const config = readJsonFileSync<any>(OPENCLAW_CONFIG_PATH);
     const port = config.gateway?.port || 18789;
     const token = config.gateway?.auth?.token || "";
     const webUrl = `http://localhost:${port}/chat${token ? '?token=' + encodeURIComponent(token) : ''}`;

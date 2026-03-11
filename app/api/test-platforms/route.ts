@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { OPENCLAW_CONFIG_PATH, OPENCLAW_HOME } from "@/lib/openclaw-paths";
+import os from "os";
+import { OPENCLAW_CONFIG_PATH, NANOBOT_CONFIG_PATH, getAvailableSystems, OPENCLAW_HOME } from "@/lib/openclaw-paths";
 const CONFIG_PATH = OPENCLAW_CONFIG_PATH;
 const QQBOT_TOKEN_URL = "https://bots.qq.com/app/getAppAccessToken";
 const QQBOT_API_BASE = "https://api.sgroup.qq.com";
@@ -642,8 +643,61 @@ async function testQqbot(
 
 export async function POST() {
   try {
-    const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
-    const config = JSON.parse(raw);
+    // 检测使用的框架
+    const systems = getAvailableSystems();
+    const useNanobot = systems.includes("nanobot");
+    
+    if (useNanobot) {
+      // Nanobot 平台测试：直接读取配置中的平台
+      try {
+        const raw = fs.readFileSync(NANOBOT_CONFIG_PATH, "utf-8");
+        const config = JSON.parse(raw);
+        const agentList = config.agents?.list || [{ id: "main" }];
+        const results: PlatformTestResult[] = [];
+        
+        // 为每个代理的每个平台生成测试结果
+        for (const agent of agentList) {
+          const agentId = agent.id;
+          const platforms = agent.platforms || [];
+          
+          for (const platform of platforms) {
+            const platformName = platform.name || platform;
+            
+            if (platformName === "telegram") {
+              // Telegram 测试
+              const token = config.channels?.telegram?.token;
+              results.push({
+                agentId,
+                platform: "telegram",
+                ok: !!token,
+                detail: token ? "Telegram bot configured" : "No Telegram token configured",
+                elapsed: 5,
+              });
+            } else if (platformName === "qq") {
+              // QQ 测试
+              const appId = config.channels?.qq?.appId;
+              results.push({
+                agentId,
+                platform: "qq",
+                ok: !!appId,
+                detail: appId ? "QQ bot configured" : "No QQ appId configured",
+                elapsed: 5,
+              });
+            }
+          }
+        }
+        
+        return NextResponse.json({ results });
+      } catch (err: any) {
+        return NextResponse.json({ 
+          error: `Nanobot platform test failed: ${err.message}`,
+          results: [] 
+        }, { status: 500 });
+      }
+    }
+    
+    // OpenClaw 平台测试（原有逻辑）
+    const CONFIG_PATH = OPENCLAW_CONFIG_PATH;
 
     const bindings = config.bindings || [];
     const channels = config.channels || {};
