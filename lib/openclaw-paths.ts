@@ -1,12 +1,37 @@
 import os from "os";
 import path from "path";
+import fs from "fs";
 
 const home = os.homedir();
 
+// OpenClaw paths
 export const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.join(home, ".openclaw");
 export const OPENCLAW_CONFIG_PATH = path.join(OPENCLAW_HOME, "openclaw.json");
 export const OPENCLAW_AGENTS_DIR = path.join(OPENCLAW_HOME, "agents");
 export const OPENCLAW_PIXEL_OFFICE_DIR = path.join(OPENCLAW_HOME, "pixel-office");
+
+// Nanobot paths
+export const NANOBOT_HOME = process.env.NANOBOT_HOME || path.join(home, ".nanobot");
+export const NANOBOT_CONFIG_PATH = path.join(NANOBOT_HOME, "config.json");
+
+// Helper to detect which systems are available
+export function getAvailableSystems(): string[] {
+  const systems: string[] = [];
+  
+  try {
+    if (fs.existsSync(OPENCLAW_CONFIG_PATH)) {
+      systems.push("openclaw");
+    }
+  } catch {}
+  
+  try {
+    if (fs.existsSync(NANOBOT_CONFIG_PATH)) {
+      systems.push("nanobot");
+    }
+  } catch {}
+  
+  return systems;
+}
 
 function uniquePaths(paths: Array<string | undefined>): string[] {
   return Array.from(new Set(paths.filter((value): value is string => Boolean(value && value.trim()))));
