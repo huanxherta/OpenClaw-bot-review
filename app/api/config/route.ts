@@ -8,11 +8,20 @@ let CONFIG_PATH = NANOBOT_CONFIG_PATH;
 let OPENCLAW_DIR = NANOBOT_HOME;
 let FRAMEWORK = "nanobot";
 
+// 详细的诊断日志
+console.log("[Config] Nanobot path:", NANOBOT_CONFIG_PATH, "exists:", fs.existsSync(NANOBOT_CONFIG_PATH));
+console.log("[Config] OpenClaw path:", OPENCLAW_CONFIG_PATH, "exists:", fs.existsSync(OPENCLAW_CONFIG_PATH));
+
 // 如果 Nanobot 不存在，则使用 OpenClaw
 if (!fs.existsSync(NANOBOT_CONFIG_PATH) && fs.existsSync(OPENCLAW_CONFIG_PATH)) {
   CONFIG_PATH = OPENCLAW_CONFIG_PATH;
   OPENCLAW_DIR = OPENCLAW_HOME;
   FRAMEWORK = "openclaw";
+  console.log("[Config] Using OpenClaw as fallback");
+} else if (fs.existsSync(NANOBOT_CONFIG_PATH)) {
+  console.log("[Config] Using Nanobot");
+} else {
+  console.log("[Config] WARNING: Neither Nanobot nor OpenClaw config found!");
 }
 
 // 30秒内存缓存
@@ -269,8 +278,10 @@ export async function GET() {
   }
 
   try {
+    console.log("[Config GET] Loading from:", CONFIG_PATH, "Framework:", FRAMEWORK);
     const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
     const config = JSON.parse(raw);
+    console.log("[Config GET] Successfully loaded", FRAMEWORK, "config");
 
     // 提取 agents 信息
     const defaults = config.agents?.defaults || {};
@@ -558,6 +569,14 @@ export async function GET() {
     configCache = { data, ts: Date.now() };
     return NextResponse.json(data);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("[Config GET] Error:", err.message);
+    console.error("[Config GET] Error code:", err.code);
+    console.error("[Config GET] Attempting to load from:", CONFIG_PATH);
+    return NextResponse.json({ 
+      error: err.message,
+      framework: FRAMEWORK,
+      configPath: CONFIG_PATH,
+      code: err.code
+    }, { status: 500 });
   }
 }

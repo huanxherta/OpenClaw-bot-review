@@ -19,18 +19,29 @@ export async function GET() {
     let configHome = NANOBOT_HOME;
     let framework = "nanobot";
 
+    console.log("[Nanobot Config] Nanobot path:", NANOBOT_CONFIG_PATH, "exists:", fs.existsSync(NANOBOT_CONFIG_PATH));
+    console.log("[Nanobot Config] OpenClaw path:", OPENCLAW_CONFIG_PATH, "exists:", fs.existsSync(OPENCLAW_CONFIG_PATH));
+
     if (!fs.existsSync(NANOBOT_CONFIG_PATH)) {
       // 如果 Nanobot 不存在，尝试 OpenClaw
       if (fs.existsSync(OPENCLAW_CONFIG_PATH)) {
         configPath = OPENCLAW_CONFIG_PATH;
         configHome = OPENCLAW_HOME;
         framework = "openclaw";
+        console.log("[Nanobot Config] Nanobot not found, using OpenClaw fallback");
       } else {
+        console.error("[Nanobot Config] Neither Nanobot nor OpenClaw config found!");
         return NextResponse.json(
-          { error: "Neither Nanobot nor OpenClaw configuration found" },
+          { 
+            error: "Neither Nanobot nor OpenClaw configuration found",
+            nanobot_path: NANOBOT_CONFIG_PATH,
+            openclaw_path: OPENCLAW_CONFIG_PATH
+          },
           { status: 404 }
         );
       }
+    } else {
+      console.log("[Nanobot Config] Using Nanobot config");
     }
 
     const raw = fs.readFileSync(configPath, "utf-8");
@@ -94,10 +105,18 @@ export async function GET() {
       configCache = { data: result, ts: Date.now() };
       return NextResponse.json(result);
     }
-  } catch (err) {
-    console.error("Failed to load config:", err);
+  } catch (err: any) {
+    console.error("[Nanobot Config] Error loading config:", err.message);
+    console.error("[Nanobot Config] Error code:", err.code);
+    console.error("[Nanobot Config] Nanobot path:", NANOBOT_CONFIG_PATH);
+    console.error("[Nanobot Config] OpenClaw path:", OPENCLAW_CONFIG_PATH);
     return NextResponse.json(
-      { error: (err as Error).message },
+      { 
+        error: (err as Error).message,
+        code: err.code,
+        nanobot_path: NANOBOT_CONFIG_PATH,
+        openclaw_path: OPENCLAW_CONFIG_PATH
+      },
       { status: 500 }
     );
   }
