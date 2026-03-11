@@ -304,50 +304,69 @@ async function probeModelDirect(params: ProbeModelParams): Promise<DirectProbeRe
 async function probeProviderViaOpenclaw(params: ProbeModelParams): Promise<ModelProbeOutcome> {
   const timeoutMs = params.timeoutMs ?? DEFAULT_MODEL_PROBE_TIMEOUT_MS;
   const startedAt = Date.now();
-  const { stdout, stderr } = await execOpenclaw([
-      "models",
-      "status",
-      "--probe",
-      "--json",
-      "--probe-timeout",
-      String(timeoutMs),
-      "--probe-provider",
-      String(params.providerId),
-    ]);
-  const parsed = parseJsonFromMixedOutput(`${stdout}\n${stderr || ""}`);
-  const results: ProbeResult[] = parsed?.auth?.probes?.results || [];
-  const fullModel = `${params.providerId}/${params.modelId}`;
+  
+  try {
+    const { stdout, stderr } = await execOpenclaw([
+        "models",
+        "status",
+        "--probe",
+        "--json",
+        "--probe-timeout",
+        String(timeoutMs),
+        "--probe-provider",
+        String(params.providerId),
+      ]);
+    const parsed = parseJsonFromMixedOutput(`${stdout}\n${stderr || ""}`);
+    const results: ProbeResult[] = parsed?.auth?.probes?.results || [];
+    const fullModel = `${params.providerId}/${params.modelId}`;
 
-  const exact =
-    results.find((r) => r.provider === params.providerId && r.model === fullModel) ||
-    results.find((r) => r.provider === params.providerId && typeof r.model === "string" && r.model.endsWith(`/${params.modelId}`));
-  const matched = exact || results.find((r) => r.provider === params.providerId);
+    const exact =
+      results.find((r) => r.provider === params.providerId && r.model === fullModel) ||
+      results.find((r) => r.provider === params.providerId && typeof r.model === "string" && r.model.endsWith(`/${params.modelId}`));
+    const matched = exact || results.find((r) => r.provider === params.providerId);
 
-  if (!matched) {
+    if (!matched) {
+      return {
+        ok: false,
+        elapsed: Date.now() - startedAt,
+        model: fullModel,
+        mode: "unknown",
+        status: "unknown",
+        error: `No probe result for provider ${params.providerId}`,
+        precision: "provider",
+        source: "openclaw_provider_probe",
+      };
+    }
+
+    const ok = matched.status === "ok";
+    return {
+      ok,
+      elapsed: matched.latencyMs ?? (Date.now() - startedAt),
+      model: matched.model || fullModel,
+      mode: matched.mode || "unknown",
+      status: matched.status || "unknown",
+      error: ok ? undefined : (matched.error || `Probe status: ${matched.status || "unknown"}`),
+      precision: exact ? "model" : "provider",
+      source: "openclaw_provider_probe",
+      text: ok ? `OK (${exact ? "model-level" : "provider-level"} openclaw probe)` : undefined,
+    };
+  } catch (err: any) {
+    // OpenClaw command not available (e.g., in nanobot-only environments)
+    const elapsed = Date.now() - startedAt;
+    const fullModel = `${params.providerId}/${params.modelId}`;
+    const errorMsg = err.code === "ENOENT" ? "OpenClaw CLI not available" : err.message;
+    
     return {
       ok: false,
-      elapsed: Date.now() - startedAt,
+      elapsed,
       model: fullModel,
       mode: "unknown",
-      status: "unknown",
-      error: `No probe result for provider ${params.providerId}`,
+      status: "unavailable",
+      error: errorMsg,
       precision: "provider",
       source: "openclaw_provider_probe",
     };
   }
-
-  const ok = matched.status === "ok";
-  return {
-    ok,
-    elapsed: matched.latencyMs ?? (Date.now() - startedAt),
-    model: matched.model || fullModel,
-    mode: matched.mode || "unknown",
-    status: matched.status || "unknown",
-    error: ok ? undefined : (matched.error || `Probe status: ${matched.status || "unknown"}`),
-    precision: exact ? "model" : "provider",
-    source: "openclaw_provider_probe",
-    text: ok ? `OK (${exact ? "model-level" : "provider-level"} openclaw probe)` : undefined,
-  };
 }
 
 export function parseModelRef(modelStr: string): { providerId: string; modelId: string } {

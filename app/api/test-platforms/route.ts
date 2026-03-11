@@ -655,35 +655,56 @@ export async function POST() {
         const agentList = config.agents?.list || [{ id: "main" }];
         const results: PlatformTestResult[] = [];
         
-        // 为每个代理的每个平台生成测试结果
+        // 从 channels 配置中提取已启用的平台
+        const channels = config.channels || {};
+        const enabledPlatforms: string[] = [];
+        
+        if (channels.telegram && channels.telegram.enabled !== false) {
+          enabledPlatforms.push("telegram");
+        }
+        if (channels.qq && channels.qq.enabled !== false) {
+          enabledPlatforms.push("qq");
+        }
+        if (channels.feishu && channels.feishu.enabled !== false) {
+          enabledPlatforms.push("feishu");
+        }
+        if (channels.discord && channels.discord.enabled !== false) {
+          enabledPlatforms.push("discord");
+        }
+        
+        // 为每个代理和启用的平台生成测试结果
         for (const agent of agentList) {
           const agentId = agent.id;
-          const platforms = agent.platforms || [];
           
-          for (const platform of platforms) {
-            const platformName = platform.name || platform;
+          for (const platformName of enabledPlatforms) {
+            let ok = false;
+            let detail = "";
             
             if (platformName === "telegram") {
-              // Telegram 测试
-              const token = config.channels?.telegram?.token;
-              results.push({
-                agentId,
-                platform: "telegram",
-                ok: !!token,
-                detail: token ? "Telegram bot configured" : "No Telegram token configured",
-                elapsed: 5,
-              });
+              const token = channels.telegram?.token;
+              ok = !!token;
+              detail = token ? "Telegram bot configured" : "No Telegram token configured";
             } else if (platformName === "qq") {
-              // QQ 测试
-              const appId = config.channels?.qq?.appId;
-              results.push({
-                agentId,
-                platform: "qq",
-                ok: !!appId,
-                detail: appId ? "QQ bot configured" : "No QQ appId configured",
-                elapsed: 5,
-              });
+              const appId = channels.qq?.appId;
+              ok = !!appId;
+              detail = appId ? "QQ bot configured" : "No QQ appId configured";
+            } else if (platformName === "feishu") {
+              const appId = channels.feishu?.appId;
+              ok = !!appId;
+              detail = appId ? "Feishu app configured" : "No Feishu appId configured";
+            } else if (platformName === "discord") {
+              const token = channels.discord?.token;
+              ok = !!token;
+              detail = token ? "Discord bot configured" : "No Discord token configured";
             }
+            
+            results.push({
+              agentId,
+              platform: platformName,
+              ok,
+              detail,
+              elapsed: 5,
+            });
           }
         }
         

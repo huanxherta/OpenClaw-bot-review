@@ -115,8 +115,14 @@ async function getOpenclawVersion(): Promise<string | undefined> {
     const version = stdout.trim().split(/\s+/)[0] || null;
     cachedOpenclawVersion = { value: version, expiresAt: now + 60 * 60 * 1000 };
     return version || undefined;
-  } catch {
-    cachedOpenclawVersion = { value: null, expiresAt: now + 60 * 1000 };
+  } catch (err: any) {
+    // If command not found, cache the error for 60 seconds
+    if (err.code === "ENOENT") {
+      cachedOpenclawVersion = { value: null, expiresAt: now + 60 * 1000 };
+      return undefined;
+    }
+    // For other errors, also cache but with shorter expiry
+    cachedOpenclawVersion = { value: null, expiresAt: now + 10 * 1000 };
     return undefined;
   }
 }
