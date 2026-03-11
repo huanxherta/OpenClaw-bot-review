@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { DEFAULT_MODEL_PROBE_TIMEOUT_MS, parseModelRef, probeModel } from "@/lib/model-probe";
-import { OPENCLAW_CONFIG_PATH, OPENCLAW_HOME } from "@/lib/openclaw-paths";
+import { OPENCLAW_CONFIG_PATH, NANOBOT_CONFIG_PATH, getAvailableSystems } from "@/lib/openclaw-paths";
+import { OPENCLAW_HOME } from "@/lib/openclaw-paths";
 
 const CONFIG_PATH = OPENCLAW_CONFIG_PATH;
 const PROBE_TIMEOUT_MS = DEFAULT_MODEL_PROBE_TIMEOUT_MS;
@@ -12,7 +13,7 @@ type AgentConfig = {
   model?: string;
 };
 
-function loadAgentList(config: any): AgentConfig[] {
+function loadAgentListOpenClaw(config: any): AgentConfig[] {
   let agentList: AgentConfig[] = config?.agents?.list || [];
   if (agentList.length > 0) return agentList;
 
@@ -28,16 +29,47 @@ function loadAgentList(config: any): AgentConfig[] {
   return agentList;
 }
 
+function loadAgentListNanobot(config: any): AgentConfig[] {
+  let agentList: AgentConfig[] = config?.agents?.list || [];
+  if (agentList.length > 0) {
+    // 从 nanobot 配置中提取代理信息
+    return agentList.map((a: any) => ({
+      id: a.id,
+      model: a.model || config.agents?.defaults?.model,
+    }));
+  }
+  return [{ id: "main", model: config.agents?.defaults?.model }];
+}
+
 export async function POST() {
   try {
-    const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
-    const config = JSON.parse(raw);
-    const defaults = config?.agents?.defaults || {};
-    const defaultModel = typeof defaults.model === "string"
-      ? defaults.model
-      : defaults.model?.primary || "unknown";
+    // 检测使用的框架
+    const systems = getAvailableSystems();
+    const useNanobot = systems.includes("nanobot");
 
-    const agentList = loadAgentList(config);
+    let raw: string;
+    let config: any;
+    let agentList: AgentConfig[];
+    let defaultModel: string;
+    let loadAgentListFn = useNanobot ? loadAgentListNanobot : loadAgentListOpenClaw;
+
+    if (useNanobot) {
+      // 使用 nanobot 配置
+      raw = fs.readFileSync(NANOBOT_CONFIG_PATH, "utf-8");
+      config = JSON.parse(raw);
+      defaultModel = config.agents?.defaults?.model || "unknown";
+      agentList = loadAgentListFn(config);
+    } else {
+      // 使用 OpenClaw 配置
+      raw = fs.readFileSync(CONFIG_PATH, "utf-8");
+      config = JSON.parse(raw);
+      const defaults = config?.agents?.defaults || {};
+      defaultModel = typeof defaults.model === "string"
+        ? defaults.model
+        : defaults.model?.primary || "unknown";
+      agentList = loadAgentListFn(config);
+    }
+
     const modelProbeTasks = new Map<string, Promise<Awaited<ReturnType<typeof probeModel>>>>();
 
     for (const agent of agentList) {
@@ -72,7 +104,7 @@ export async function POST() {
           status: "unknown",
           mode: "unknown",
           precision: "provider",
-          source: "openclaw_provider_probe",
+          source: useNanobot ? "nanobot_provider_probe" : "openclaw_provider_probe",
         };
       }
       return {
